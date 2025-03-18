@@ -1,5 +1,5 @@
 from flask import Flask, render_template, redirect, url_for, flash, request
-from flask_sqlalchemy import SQLAlchemy
+from flask_sqlalchemy import SQLAlchemy 
 from flask_wtf import FlaskForm
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user, UserMixin
 from flask_mail import Mail, Message
@@ -10,7 +10,9 @@ import os
 import random
 import string
 from dotenv import load_dotenv  # Import dotenv
-from datetime import datetime
+from sqlalchemy import func
+from itsdangerous import URLSafeTimedSerializer as Serializer, SignatureExpired
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -39,16 +41,17 @@ class User(db.Model, UserMixin):
     username = db.Column(db.String(100), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    # Flask-Login requires these methods
+    created_at = db.Column(db.DateTime, default=func.now())
+    is_confirmed = db.Column(db.Boolean, default=False)
+    
     def is_active(self):
-        return True  # Return True to indicate the user is active
+        return True
 
     def get_id(self):
         return str(self.id)
 
     def is_authenticated(self):
-        return True  # For simplicity, we're assuming the user is authenticated
+        return True  # User is assumed authenticated once logged in
 
     def is_anonymous(self):
         return False  # User is not anonymous
@@ -57,6 +60,7 @@ class User(db.Model, UserMixin):
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
 # Error Handlers
 @app.errorhandler(404)
 def page_not_found(error):
@@ -74,10 +78,6 @@ def forbidden(error):
 def bad_request(error):
     return render_template('errors/400.html'), 400
 
-# Routes
-@app.route('/')
-def index():
-    return render_template('index.html')
 # Forms
 class SigninForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired()])
@@ -93,6 +93,7 @@ class SignupForm(FlaskForm):
 class ResetPasswordForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
     submit = SubmitField('Reset Password')
+
 class ChangePasswordForm(FlaskForm):
     old_password = PasswordField('Old Password', validators=[DataRequired()])
     new_password = PasswordField('New Password', validators=[DataRequired()])
@@ -100,21 +101,11 @@ class ChangePasswordForm(FlaskForm):
     submit = SubmitField('Change Password')
 
 # Routes
-@app.route('/signin', methods=['GET', 'POST'])
-def signin():
-    form = SigninForm()
-    try:
-        if form.validate_on_submit():
-            user = User.query.filter_by(username=form.username.data).first()
-            if user and bcrypt.checkpw(form.password.data.encode('utf-8'), user.password.encode('utf-8')):
-                login_user(user)
-                flash('Sign in successful!', 'success')
-                return redirect(url_for('profile'))
-            flash('Sign in failed. Check your username and/or password.', 'danger')
-    except Exception as e:
-        flash(f'Error during Sign in: {str(e)}', 'danger')
-    return render_template('signin.html', form=form)
+@app.route('/')
+def index():
+    return render_template('index.html')
 
+# Signup route
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     form = SignupForm()
@@ -131,12 +122,68 @@ def signup():
             new_user = User(username=form.username.data, email=form.email.data, password=hashed_password)
             db.session.add(new_user)
             db.session.commit()
-            flash('Account created successfully!', 'success')
+
+            # Send confirmation email
+            send_confirmation_email(new_user)
+
+            flash('Account created successfully! Please check your email to confirm your account.', 'success')
             return redirect(url_for('signin'))
     except Exception as e:
         db.session.rollback()  # Rollback the transaction if an error occurs
         flash(f'Error during signup: {str(e)}', 'danger')
     return render_template('signup.html', form=form)
+
+# Generate confirmation token
+def generate_confirmation_token(email):
+    serializer = Serializer(app.config['SECRET_KEY'])
+    return serializer.dumps(email, salt='email-confirmation')
+
+# Send confirmation email
+def send_confirmation_email(user):
+    token = generate_confirmation_token(user.email)
+    confirm_url = url_for('confirm_email', token=token, _external=True)
+    msg = Message('Email Confirmation', recipients=[user.email], sender=app.config['MAIL_USERNAME'])
+    msg.body = f'Your email confirmation link is: {confirm_url}'
+    mail.send(msg)
+
+
+# Confirm email route
+@app.route('/confirm/<token>')
+def confirm_email(token):
+    try:
+        serializer = Serializer(app.config['SECRET_KEY'])
+        email = serializer.loads(token, salt='email-confirmation', max_age=3600)  # Token expires in 1 hour
+        user = User.query.filter_by(email=email).first()
+        if user:
+            user.is_confirmed = True
+            db.session.commit()
+            flash('Your email has been confirmed!', 'success')
+            return redirect(url_for('signin'))
+    except SignatureExpired:
+        flash('The confirmation link has expired.', 'danger')
+    except Exception as e:
+        flash(f'Error during email confirmation: {str(e)}', 'danger')
+    return redirect(url_for('signin'))
+
+# Signin route
+@app.route('/signin', methods=['GET', 'POST'])
+def signin():
+    form = SigninForm()
+    try:
+        if form.validate_on_submit():
+            user = User.query.filter_by(username=form.username.data).first()
+            if user and bcrypt.checkpw(form.password.data.encode('utf-8'), user.password.encode('utf-8')):
+                if user.is_confirmed:  # Check if the email is confirmed
+                    login_user(user)
+                    flash('Sign in successful!', 'success')
+                    return redirect(url_for('profile'))
+                else:
+                    flash('Please confirm your email address first.', 'warning')
+            else:
+                flash('Sign in failed. Check your username and/or password.', 'danger')
+    except Exception as e:
+        flash(f'Error during Sign in: {str(e)}', 'danger')
+    return render_template('signin.html', form=form)
 
 @app.route('/profile')
 @login_required
@@ -161,7 +208,6 @@ def reset_password():
             user = User.query.filter_by(email=form.email.data).first()
             if user:
                 token = ''.join(random.choices(string.ascii_letters + string.digits, k=6))  # simple token
-                # Send reset email (you can improve this)
                 msg = Message('Password Reset Request', recipients=[form.email.data])
                 msg.body = f'Your password reset token is {token}.'
                 mail.send(msg)
@@ -171,7 +217,7 @@ def reset_password():
     except Exception as e:
         flash(f'Error during password reset: {str(e)}', 'danger')
     return render_template('reset_password.html', form=form)
-# Routes
+
 @app.route('/change_password', methods=['GET', 'POST'])
 @login_required
 def change_password():
@@ -179,10 +225,8 @@ def change_password():
     try:
         if form.validate_on_submit():
             user = current_user
-            # Check if old password is correct
             if bcrypt.checkpw(form.old_password.data.encode('utf-8'), user.password.encode('utf-8')):
                 if form.new_password.data == form.confirm_password.data:
-                    # Hash the new password
                     hashed_password = bcrypt.hashpw(form.new_password.data.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
                     user.password = hashed_password
                     db.session.commit()
@@ -202,24 +246,21 @@ def delete_account():
     if request.method == 'POST':
         try:
             user = current_user
-            db.session.delete(user)  # Delete the user from the database
+            db.session.delete(user)
             db.session.commit()
             flash('Your account has been deleted successfully.', 'success')
-            logout_user()  # Log the user out after account deletion
-            return redirect(url_for('login'))  # Redirect to login page
+            logout_user()
+            return redirect(url_for('login'))
         except Exception as e:
             flash(f'Error during account deletion: {str(e)}', 'danger')
             return redirect(url_for('profile'))
-    
-    # If it's a GET request, show the confirmation page
     return render_template('delete_account.html')
-
 
 # Ensure the app creates all tables when starting
 if __name__ == "__main__":
     try:
-        with app.app_context():  # Ensure the app context is available
-            db.create_all()  # Create the database tables
+        with app.app_context():
+            db.create_all()
         app.run(debug=True)
     except Exception as e:
         print(f"Error: {str(e)}")
