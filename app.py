@@ -57,12 +57,32 @@ class User(db.Model, UserMixin):
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+# Error Handlers
+@app.errorhandler(404)
+def page_not_found(error):
+    return render_template('errors/404.html'), 404
 
+@app.errorhandler(500)
+def internal_server_error(error):
+    return render_template('errors/500.html'), 500
+
+@app.errorhandler(403)
+def forbidden(error):
+    return render_template('errors/403.html'), 403
+
+@app.errorhandler(400)
+def bad_request(error):
+    return render_template('errors/400.html'), 400
+
+# Routes
+@app.route('/')
+def index():
+    return render_template('index.html')
 # Forms
-class LoginForm(FlaskForm):
+class SigninForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired()])
     password = PasswordField('Password', validators=[DataRequired()])
-    submit = SubmitField('Login')
+    submit = SubmitField('Sign In')
 
 class SignupForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired()])
@@ -80,20 +100,20 @@ class ChangePasswordForm(FlaskForm):
     submit = SubmitField('Change Password')
 
 # Routes
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    form = LoginForm()
+@app.route('/signin', methods=['GET', 'POST'])
+def signin():
+    form = SigninForm()
     try:
         if form.validate_on_submit():
             user = User.query.filter_by(username=form.username.data).first()
             if user and bcrypt.checkpw(form.password.data.encode('utf-8'), user.password.encode('utf-8')):
                 login_user(user)
-                flash('Login successful!', 'success')
+                flash('Sign in successful!', 'success')
                 return redirect(url_for('profile'))
-            flash('Login failed. Check your username and/or password.', 'danger')
+            flash('Sign in failed. Check your username and/or password.', 'danger')
     except Exception as e:
-        flash(f'Error during login: {str(e)}', 'danger')
-    return render_template('login.html', form=form)
+        flash(f'Error during Sign in: {str(e)}', 'danger')
+    return render_template('signin.html', form=form)
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -112,7 +132,7 @@ def signup():
             db.session.add(new_user)
             db.session.commit()
             flash('Account created successfully!', 'success')
-            return redirect(url_for('login'))
+            return redirect(url_for('signin'))
     except Exception as e:
         db.session.rollback()  # Rollback the transaction if an error occurs
         flash(f'Error during signup: {str(e)}', 'danger')
@@ -131,7 +151,7 @@ def logout():
         flash('You have been logged out.', 'info')
     except Exception as e:
         flash(f'Error during logout: {str(e)}', 'danger')
-    return redirect(url_for('login'))
+    return redirect(url_for('signin'))
 
 @app.route('/reset_password', methods=['GET', 'POST'])
 def reset_password():
@@ -146,7 +166,7 @@ def reset_password():
                 msg.body = f'Your password reset token is {token}.'
                 mail.send(msg)
                 flash('Password reset link sent to your email.', 'info')
-                return redirect(url_for('login'))
+                return redirect(url_for('signin'))
             flash('Email not found.', 'danger')
     except Exception as e:
         flash(f'Error during password reset: {str(e)}', 'danger')
