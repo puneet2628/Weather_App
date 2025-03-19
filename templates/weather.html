@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <!-- <link href="{{url_for('static',filename='src/output.css')}}" rel="stylesheet" /> -->
+    <link rel="stylesheet" href="../static/src/output.css" />
+</head>
+
+<body class="bg-zinc-900 text-white">
+
+    <main>
+        <div
+            class="bg-[url(https://cdn.pixabay.com/photo/2020/05/01/07/11/rain-5115710_640.png)] bg-no-repeat bg-bottom bg-cover h-52 sm:bg-[url(https://cdn.pixabay.com/photo/2018/05/02/18/23/landscape-3369304_640.jpg)] sm:bg-top sm:opacity-90">
+            <h2 class="z-10 opacity-100 text-4xl font-semibold  lg:text-8xl text-">29°</h2>
+        </div>
+        <!-- Hourly forcast  -->
+
+        <div class="p-4">
+            <h3 class="text-lg font-semibold mb-3">Hourly forecast</h3>
+            <div class="grid grid-cols-5 gap-4 bg-zinc-800 p-4 rounded-lg text-center">
+                <div>
+                    <p>29°</p>
+                    <img src="../static/img/cloudy.png" alt="cloudy" class="w-8 mx-auto mt-5 " />
+                    <p>Now</p>
+                </div>
+                <div>
+                    <p>30°</p>
+                    <img src="../static/img/cloudy and rain.png" alt="cloudy" class="w-8 mx-auto mt-5 " />
+                    <p>1pm</p>
+                </div>
+                <div>
+                    <p>30°</p>
+                    <img src="../static/img/cloudy and rain.png" alt="cloudy" class="w-8 mx-auto mt-5 " />
+                    <p>2pm</p>
+                </div>
+                <div>
+                    <p>30°</p>
+                    <img src="../static/img/snow.png" alt="cloudy" class="w-8 mx-auto mt-5 " />
+                    <p>3pm</p>
+                </div>
+                <div>
+                    <p>30°</p>
+                    <img src="../static/img/cloudy.png" alt="cloudy" class="w-8 mx-auto mt-5 " />
+                    <p>4pm</p>
+                </div>
+            </div>
+        </div>
+        <!-- 10-days forecast  -->
+        <div class="lg:grid lg:grid-cols-2 lg:gap-4 ">
+            <div class="p-4 ">
+                <h3 class="text-lg font-semibold mb-3">10-day forecast</h3>
+
+                <div class="space-y-4">
+                    <div class="grid grid-cols-3 items-center bg-zinc-800 p-4 rounded-t-lg  ">
+                        <span class="text-left">Today</span>
+                        <img src="../static/img/cloudy.png" alt="" class="w-8 mx-auto">
+                        <span class="text-right">30°/16°</span>
+                    </div>
+
+                    <div class="grid grid-cols-3 items-center bg-zinc-800 p-4 rounded">
+                        <span class="text-left">Thursday, 20 Mar</span>
+                        <img src="../static/img/sun.png" alt="" class="w-8 mx-auto">
+                        <span class="text-right">30°/16°</span>
+                    </div>
+
+                    <div class="grid grid-cols-3 items-center bg-zinc-800 p-4 rounded">
+                        <span class="text-left">Friday, 21 Mar</span>
+                        <img src="../static/img/sun.png" alt="" class="w-8 mx-auto">
+                        <span class="text-right">30°/16°</span>
+                    </div>
+
+                    <div class="grid grid-cols-3 items-center bg-zinc-800 p-4 rounded">
+                        <span class="text-left">Saturday, 22 Mar</span>
+                        <img src="../static/img/cloudy.png" alt="" class="w-8 mx-auto">
+                        <span class="text-right">30°/16°</span>
+                    </div>
+
+                    <div class="grid grid-cols-3 items-center bg-zinc-800 p-4 rounded">
+                        <span class="text-left">Sunday, 23 Mar</span>
+                        <img src="../static/img/cloudy and rain.png" alt="" class="w-8 mx-auto">
+                        <span class="text-right">30°/16°</span>
+                    </div>
+
+                    <div class="grid grid-cols-3 items-center bg-zinc-800 p-4 rounded">
+                        <span class="text-left">Monday, 24 Mar</span>
+                        <img src="../static/img/storm.png" alt="" class="w-8 mx-auto">
+                        <span class="text-right">30°/16°</span>
+                    </div>
+
+                    <div class="grid grid-cols-3 items-center bg-zinc-800 p-4 rounded">
+                        <span class="text-left">Tuesday, 25 Mar</span>
+                        <img src="../static/img/snow.png" alt="" class="w-8 mx-auto">
+                        <span class="text-right">30°/16°</span>
+                    </div>
+
+                    <div class="grid grid-cols-3 items-center bg-zinc-800 p-4 rounded">
+                        <span class="text-left">Wednesday, 26 Mar</span>
+                        <img src="../static/img/cloudy.png" alt="" class="w-8 mx-auto">
+                        <span class="text-right">30°/16°</span>
+                    </div>
+
+                    <div class="grid grid-cols-3 items-center bg-zinc-800 p-4 rounded">
+                        <span class="text-left">Thursday, 27 Mar</span>
+                        <img src="../static/img/cloudy.png" alt="" class="w-8 mx-auto">
+                        <span class="text-right">30°/16°</span>
+                    </div>
+
+                    <div class="grid grid-cols-3 items-center bg-zinc-800 p-4 rounded-b-lg">
+                        <span class="text-left">Friday, 27 Mar</span>
+                        <img src="../static/img/cloudy.png" alt="" class="w-8 mx-auto">
+                        <span class="text-right">30°/16°</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- current Conditions  -->
+
+            <div class="p-4">
+                <h2 class="text-lg font-semibold mb-3">Current Conditions</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4  ">
+                    <div class="bg-zinc-800   rounded-lg">
+                        <p class="p-4 text-lg font-semibold">Wind</p>
+                        <img src="../static/img/wind.png" alt="" class="w-30 mx-20">
+                        <p class="p-4 text-lg font-semibold"> <span class="text-2xl">14</span> Kph</p>
+                        <p class="ml-4 font-semibold">Light . From northwest</p>
+                    </div>
+
+                    <div class="bg-zinc-800    rounded-lg">
+                        <p class="p-4 text-lg font-semibold">Humidity</p>
+                        <img src="../static/img/humidity.png" alt="" class="w-30 mx-20">
+                        <p class="p-4 text-lg font-semibold"> <span class="text-2xl">25</span> %</p>
+                        <p class="ml-4 font-semibold">Dew Point 7°</p>
+                    </div>
+
+                    <div class="bg-zinc-800    rounded-lg">
+                        <p class="p-4 text-lg font-semibold">UV Index </p>
+                        <img src="../static/img/uv-index.png" alt="" class="w-30 mx-20">
+                        <p class="p-4 text-lg font-semibold"> <span class="text-2xl">5</span> </p>
+                        <p class="ml-4 font-semibold">Moderate</p>
+                    </div>
+
+                    <div class="bg-zinc-800    rounded-lg">
+                        <p class="p-4 text-lg font-semibold">Pressure</p>
+                        <img src="../static/img/cloudy.png" alt="" class="w-30 mx-20 hover:animate-pulse">
+                        <p class="p-4 text-lg font-semibold"> <span class="text-2xl">1,013</span> </p>
+                        <p class="ml-4 font-semibold">mBar</p>
+                    </div>
+                    <div class="bg-zinc-800    rounded-lg sm:col-span-2 ">
+                        <p class="p-4 text-lg font-semibold">Pressure</p>
+                        <img src="../static/img/cloudy.png" alt="" class="w-30 mx-20 hover:animate-pulse sm:h-16">
+                        <p class="p-4 text-lg font-semibold"> <span class="text-2xl">1,013</span> </p>
+                        <p class="ml-4 font-semibold">mBar</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</body>
+
+</html>
