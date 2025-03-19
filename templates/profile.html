@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% block title %}Profile - {{ username }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md">
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">Your Profile</h2>
+        <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">Active</span>
+    </div>
+    
+    <div class="space-y-4">
+        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+                <p class="text-sm text-gray-600">Username</p>
+                <p class="font-medium">{{ current_user.username }}</p>
+            </div>
+            <button class="text-blue-600 hover:underline text-sm">Edit</button>
+        </div>
+        
+        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+                <p class="text-sm text-gray-600">Email</p>
+                <p class="font-medium">{{ current_user.email }}</p>
+            </div>
+            <button class="text-blue-600 hover:underline text-sm">Change</button>
+        </div>
+        
+        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+                <p class="text-sm text-gray-600">Member Since</p>
+                <p class="font-medium">{{ current_user.created_at.strftime('%B %d, %Y') }}</p>
+            </div>
+        </div>
+        
+        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+                <p class="text-sm text-gray-600">Last Sign In</p>
+                <p class="font-medium">{{ current_user.last_login.strftime('%B %d, %Y %H:%M') if current_user.last_login else 'Never' }}</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="mt-8 space-y-4">
+        <a href="{{ url_for('change_password') }}" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">Change Password</a>
+        <a href="{{ url_for('delete_account') }}" class="w-full bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
+            Delete Account
+        </a>
+    </div>
+    <div class="mt-4 text-center">
+        <a href="{{ url_for('logout') }}" class="text-sm text-blue-600 hover:underline">Logout</a>
+    </div>
+</div>
+{% endblock %}
