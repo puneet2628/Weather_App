@@ -5,25 +5,38 @@
 {% block content %}
 <div class="max-w-4xl mx-auto text-center">
     {% if current_user.is_authenticated %}
-        <h1 class="text-4xl font-bold text-gray-800 mb-4">Welcome back, {{ current_user.username }}!</h1>
-        <p class="text-xl text-gray-600 mb-8">Check today's weather forecast</p>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-xl font-semibold mb-4">Current Weather</h2>
-                <!-- Weather content will go here -->
-            </div>
-            <div class="bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-xl font-semibold mb-4">Forecast</h2>
-                <!-- Forecast content will go here -->
-            </div>
+    <h1 class="text-4xl font-bold text-gray-800 mb-4">Welcome back, {{ current_user.username }}!</h1>
+    <p class="text-xl text-gray-600 mb-8">Check today's weather forecast</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+       {% if weather %} 
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">Current Weather</h2>
+            {{ weather.location.name }}
+            {{ weather.location.lat }}
+            {{ weather.location.lon }}
+            <!-- {{ weather.current.temp }} -->
         </div>
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">Forecast</h2>
+            <!-- {% for day in weather.forecast %}
+            <p>{{day.date}}</p>
+            <p>{{day.high}}</p>
+            <p>{{day.low}}</p>
+            <p>{{day.icon}}</p>
+            <p>{{day.precipitation}}</p>
+            {% endfor %} -->
+        </div>
+        {% endif %}
+    </div>
     {% else %}
-        <h1 class="text-4xl font-bold text-gray-800 mb-4">Welcome to Horizon App</h1>
-        <p class="text-xl text-gray-600 mb-8">Get accurate weather forecasts for any location</p>
-        <div class="space-x-4">
-            <a href="{{ url_for('signin') }}" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">Sign In</a>
-            <a href="{{ url_for('signup') }}" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700">Sign Up</a>
-        </div>
+    <h1 class="text-4xl font-bold text-gray-800 mb-4">Welcome to Horizon App</h1>
+    <p class="text-xl text-gray-600 mb-8">Get accurate weather forecasts for any location</p>
+    <div class="space-x-4">
+        <a href="{{ url_for('signin') }}" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">Sign
+            In</a>
+        <a href="{{ url_for('signup') }}" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700">Sign
+            Up</a>
+    </div>
     {% endif %}
 </div>
 {% endblock %}

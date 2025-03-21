@@ -10,7 +10,8 @@ import os
 from dotenv import load_dotenv
 from sqlalchemy import func
 from itsdangerous import URLSafeTimedSerializer as Serializer, SignatureExpired
-
+import requests
+from datetime import datetime
 # Load environment variables
 load_dotenv()
 
@@ -24,6 +25,8 @@ app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
 app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', 'True').lower() in ('true', '1', 't')
 app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
 app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
+# Weather api key secret
+app.config['API_KEY'] = os.getenv('API_KEY')
 
 # Initialize extensions
 db = SQLAlchemy(app)
@@ -101,10 +104,146 @@ def send_confirmation_email(user):
     msg.body = f'Please confirm your email: {confirm_url}'
     mail.send(msg)
 
+# Fuction to fetch data from Weather Api
+
+def fetch_weather(location):
+    api_key = app.config['API_KEY']
+    url = (
+        f'https://api.tomorrow.io/v4/timelines'
+        f'?location={location}'
+        f'&fields=temperatureMax,temperatureMin,weatherCode,humidity,windSpeed,precipitationProbability'
+        f'&timesteps=1d'
+        f'&units=metric'
+        f'&apikey={api_key}'
+    )
+    # response =  requests.get(url)
+    response = {
+        "timelines": {
+            "minutely": [
+                {
+                    "time": "2025-03-21T17:45:00Z",
+                    "values": {
+                        "cloudBase": 0.3,
+                        "cloudCeiling": 0.3,
+                        "cloudCover": 97,
+                        "dewPoint": 21.8,
+                        "freezingRainIntensity": 0,
+                        "hailProbability": 70.8,
+                        "hailSize": 3.99,
+                        "humidity": 88,
+                        "precipitationProbability": 0,
+                        "pressureSeaLevel": 1014.38,
+                        "pressureSurfaceLevel": 1014.7,
+                        "rainIntensity": 0,
+                        "sleetIntensity": 0,
+                        "snowIntensity": 0,
+                        "temperature": 21.8,
+                        "temperatureApparent": 21.8,
+                        "uvHealthConcern": 0,
+                        "uvIndex": 0,
+                        "visibility": 14.93,
+                        "weatherCode": 1001,
+                        "windDirection": 174,
+                        "windGust": 2.6,
+                        "windSpeed": 1.3
+                    }
+                },
+                {
+                    "time": "2025-03-22T03:00:00Z",
+                    "values": {
+                        "cloudBase": 4.7,
+                        "cloudCeiling": 4.7,
+                        "cloudCover": 100,
+                        "dewPoint": 20.3,
+                        "evapotranspiration": 0.041,
+                        "freezingRainIntensity": 0,
+                        "hailProbability": 85.2,
+                        "hailSize": 1.77,
+                        "humidity": 88,
+                        "iceAccumulation": 0,
+                        "iceAccumulationLwe": 0,
+                        "precipitationProbability": 20,
+                        "pressureSeaLevel": 1017.19,
+                        "pressureSurfaceLevel": 1016.29,
+                        "rainAccumulation": 0.37,
+                        "rainIntensity": 0.02,
+                        "sleetAccumulationLwe": 0,
+                        "sleetIntensity": 0,
+                        "snowAccumulation": 0,
+                        "snowAccumulationLwe": 0,
+                        "snowIntensity": 0,
+                        "temperature": 22.4,
+                        "temperatureApparent": 22.4,
+                        "uvHealthConcern": 0,
+                        "uvIndex": 1,
+                        "visibility": 13.22,
+                        "weatherCode": 1001,
+                        "windDirection": 194,
+                        "windGust": 3.2,
+                        "windSpeed": 1.4
+                    }
+                }
+            ]
+        },
+        "location": {
+            "lat": 22.53542709350586,
+            "lon": 88.36331176757812,
+            "name": "Kolkata, West Bengal, India",
+            "type": "administrative"
+        },
+        "status_code": 200
+    }
+# To print the response, just use:
+    print(response)
+
+    if response["status_code"] == 200:
+        # data = response.json()
+        timelines = response['timelines']['minutely']
+        current = timelines[0]['values']
+        location = response['location']
+        print(location)
+        current_weather = {
+            'temp': current['temperature'],
+            'condition': weather_code_to_condition(current['weatherCode']),
+            'icon': weather_code_to_icon(current['weatherCode']),
+            'humidity': current['humidity'],
+            'wind_speed': current['windSpeed'],
+        }
+        forecast = []
+        for day in timelines[:10]:
+            values = day['values']
+            # date = datetime.fromisoformat(day['startTime'].replace('Z','+00:00'))
+            forecast.append({
+                # 'date':date.strftime('%a','%b','%d'),
+                'high':round(values['temperature']),
+                'low':round(values['temperature']),
+                'condition':weather_code_to_condition(current['weatherCode']),
+                'icon':weather_code_to_icon(current['weatherCode']),
+                'precipitation':values['precipitationProbability'],
+            })
+            print(location)
+        return {'location':location,'current':current_weather,'forecast':forecast}
+    return None
+
+def weather_code_to_condition(code):
+    codes = {1000:'Clear',1100:'Mostly Clear'}
+    return codes.get(code,'unknown')
+def weather_code_to_icon(code):
+    codes = {1000:'fas fa-sun',1100:'fas fa-cloud-sun'}
+    return codes.get(code,'unknown')
+
 # Routes
-@app.route('/')
+@app.route('/',methods=['GET', 'POST'])
 def index():
-    return render_template('index.html')
+    if request.method == 'POST':
+        location = request.form.get('location','').strip()
+        if location:
+            weather_data = fetch_weather(location)
+        else:
+            weather_data = None
+    else:
+        weather_data = fetch_weather('kolkata')
+    return render_template('index.html',weather=weather_data)
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
