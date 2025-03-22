@@ -131,9 +131,9 @@ def save_cache(location, weather_data):
         json.dump(cache_data, f)
 
 
-
+# Horizon weather Powwered by Tommorow API
 def fetch_weather(location):
-    # Try to get cached data first
+
     cached_data = load_cache(location)
     if cached_data:
         cached_data['cached'] = True
@@ -143,7 +143,7 @@ def fetch_weather(location):
     url = (
         f'https://api.tomorrow.io/v4/weather/forecast'
         f'?location={location}'
-        f'&timesteps=minutely'  # Changed to minutely
+        f'&timesteps=minutely'  
         f'&units=metric'
         f'&apikey={api_key}'
     )
@@ -151,7 +151,7 @@ def fetch_weather(location):
     try:
         response = requests.get(url, timeout=10)
         
-        # Handle rate limiting
+      
         if response.status_code == 429:
             print("Rate limit reached")
             cached_data = load_cache(location)
@@ -169,7 +169,7 @@ def fetch_weather(location):
         if 'timelines' not in data or 'minutely' not in data['timelines']:
             return None
             
-        # Get current weather from first minutely data point
+
         current = data['timelines']['minutely'][0]['values']
         location_name = data['location']['name'] if 'location' in data else location
         
@@ -185,17 +185,17 @@ def fetch_weather(location):
             'pressure': round(current.get('pressureSurfaceLevel', 0))
         }
         
-        # Create forecast from available data points
+      
         forecast = []
-        for point in data['timelines']['minutely'][1:6]:  # Use next 5 data points
+        for point in data['timelines']['minutely'][1:6]: 
             values = point['values']
             date = datetime.fromisoformat(point['time'].replace('Z', '+00:00'))
             forecast.append({
                 'date': date.strftime('%a %b %d'),
                 'time': date.strftime('%H:%M'),
                 'temp': round(values.get('temperature', 0)),
-                'high': round(values.get('temperature', 0)),  # Using current temp as high
-                'low': round(values.get('temperatureApparent', 0)),  # Using feels like as low
+                'high': round(values.get('temperature', 0)),  
+                'low': round(values.get('temperatureApparent', 0)),  
                 'condition': weather_code_to_condition(values.get('weatherCode', 0)),
                 'icon': weather_code_to_icon(values.get('weatherCode', 0)),
                 'precipitation': values.get('precipitationProbability', 0),
@@ -292,7 +292,7 @@ def index():
     
     weather_data = fetch_weather(location)
     return render_template('index.html', weather=weather_data)
-
+# Horizon weather Powwered by Tommorow API END
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     form = SignupForm()
