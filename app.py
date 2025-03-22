@@ -11,7 +11,9 @@ from dotenv import load_dotenv
 from sqlalchemy import func
 from itsdangerous import URLSafeTimedSerializer as Serializer, SignatureExpired
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
+import json
+
 # Load environment variables
 load_dotenv()
 
@@ -106,144 +108,190 @@ def send_confirmation_email(user):
 
 # Fuction to fetch data from Weather Api
 
+def load_cache(location):
+    cache_file = f'cache/{location.lower()}_weather.json'
+    if os.path.exists(cache_file):
+        with open(cache_file, 'r') as f:
+            cache_data = json.load(f)
+            # Check if cache is less than 30 minutes old
+            cached_time = datetime.fromisoformat(cache_data['cached_at'])
+            if datetime.now() - cached_time < timedelta(minutes=30):
+                return cache_data['weather_data']
+    return None
+
+def save_cache(location, weather_data):
+    if not os.path.exists('cache'):
+        os.makedirs('cache')
+    cache_file = f'cache/{location.lower()}_weather.json'
+    cache_data = {
+        'weather_data': weather_data,
+        'cached_at': datetime.now().isoformat()
+    }
+    with open(cache_file, 'w') as f:
+        json.dump(cache_data, f)
+
+
+
 def fetch_weather(location):
+    # Try to get cached data first
+    cached_data = load_cache(location)
+    if cached_data:
+        cached_data['cached'] = True
+        return cached_data
+
     api_key = app.config['API_KEY']
     url = (
-        f'https://api.tomorrow.io/v4/timelines'
+        f'https://api.tomorrow.io/v4/weather/forecast'
         f'?location={location}'
-        f'&fields=temperatureMax,temperatureMin,weatherCode,humidity,windSpeed,precipitationProbability'
-        f'&timesteps=1d'
+        f'&timesteps=minutely'  # Changed to minutely
         f'&units=metric'
         f'&apikey={api_key}'
     )
-    # response =  requests.get(url)
-    response = {
-        "timelines": {
-            "minutely": [
-                {
-                    "time": "2025-03-21T17:45:00Z",
-                    "values": {
-                        "cloudBase": 0.3,
-                        "cloudCeiling": 0.3,
-                        "cloudCover": 97,
-                        "dewPoint": 21.8,
-                        "freezingRainIntensity": 0,
-                        "hailProbability": 70.8,
-                        "hailSize": 3.99,
-                        "humidity": 88,
-                        "precipitationProbability": 0,
-                        "pressureSeaLevel": 1014.38,
-                        "pressureSurfaceLevel": 1014.7,
-                        "rainIntensity": 0,
-                        "sleetIntensity": 0,
-                        "snowIntensity": 0,
-                        "temperature": 21.8,
-                        "temperatureApparent": 21.8,
-                        "uvHealthConcern": 0,
-                        "uvIndex": 0,
-                        "visibility": 14.93,
-                        "weatherCode": 1001,
-                        "windDirection": 174,
-                        "windGust": 2.6,
-                        "windSpeed": 1.3
-                    }
-                },
-                {
-                    "time": "2025-03-22T03:00:00Z",
-                    "values": {
-                        "cloudBase": 4.7,
-                        "cloudCeiling": 4.7,
-                        "cloudCover": 100,
-                        "dewPoint": 20.3,
-                        "evapotranspiration": 0.041,
-                        "freezingRainIntensity": 0,
-                        "hailProbability": 85.2,
-                        "hailSize": 1.77,
-                        "humidity": 88,
-                        "iceAccumulation": 0,
-                        "iceAccumulationLwe": 0,
-                        "precipitationProbability": 20,
-                        "pressureSeaLevel": 1017.19,
-                        "pressureSurfaceLevel": 1016.29,
-                        "rainAccumulation": 0.37,
-                        "rainIntensity": 0.02,
-                        "sleetAccumulationLwe": 0,
-                        "sleetIntensity": 0,
-                        "snowAccumulation": 0,
-                        "snowAccumulationLwe": 0,
-                        "snowIntensity": 0,
-                        "temperature": 22.4,
-                        "temperatureApparent": 22.4,
-                        "uvHealthConcern": 0,
-                        "uvIndex": 1,
-                        "visibility": 13.22,
-                        "weatherCode": 1001,
-                        "windDirection": 194,
-                        "windGust": 3.2,
-                        "windSpeed": 1.4
-                    }
-                }
-            ]
-        },
-        "location": {
-            "lat": 22.53542709350586,
-            "lon": 88.36331176757812,
-            "name": "Kolkata, West Bengal, India",
-            "type": "administrative"
-        },
-        "status_code": 200
-    }
-# To print the response, just use:
-    print(response)
+    
+    try:
+        response = requests.get(url, timeout=10)
+        
+        # Handle rate limiting
+        if response.status_code == 429:
+            print("Rate limit reached")
+            cached_data = load_cache(location)
+            if cached_data:
+                cached_data['cached'] = True
+                return cached_data
+            return None
+            
+        response.raise_for_status()
+        data = response.json()
+        
+        if 'status_code' in data and data['status_code'] != 200:
+            return None
 
-    if response["status_code"] == 200:
-        # data = response.json()
-        timelines = response['timelines']['minutely']
-        current = timelines[0]['values']
-        location = response['location']
-        print(location)
+        if 'timelines' not in data or 'minutely' not in data['timelines']:
+            return None
+            
+        # Get current weather from first minutely data point
+        current = data['timelines']['minutely'][0]['values']
+        location_name = data['location']['name'] if 'location' in data else location
+        
         current_weather = {
-            'temp': current['temperature'],
-            'condition': weather_code_to_condition(current['weatherCode']),
-            'icon': weather_code_to_icon(current['weatherCode']),
-            'humidity': current['humidity'],
-            'wind_speed': current['windSpeed'],
+            'temp': round(current.get('temperature', 0)),
+            'condition': weather_code_to_condition(current.get('weatherCode', 0)),
+            'icon': weather_code_to_icon(current.get('weatherCode', 0)),
+            'humidity': round(current.get('humidity', 0)),
+            'wind_speed': round(current.get('windSpeed', 0)),
+            'feels_like': round(current.get('temperatureApparent', 0)),
+            'uv_index': current.get('uvIndex', 0),
+            'visibility': round(current.get('visibility', 0)),
+            'pressure': round(current.get('pressureSurfaceLevel', 0))
         }
+        
+        # Create forecast from available data points
         forecast = []
-        for day in timelines[:10]:
-            values = day['values']
-            # date = datetime.fromisoformat(day['startTime'].replace('Z','+00:00'))
+        for point in data['timelines']['minutely'][1:6]:  # Use next 5 data points
+            values = point['values']
+            date = datetime.fromisoformat(point['time'].replace('Z', '+00:00'))
             forecast.append({
-                # 'date':date.strftime('%a','%b','%d'),
-                'high':round(values['temperature']),
-                'low':round(values['temperature']),
-                'condition':weather_code_to_condition(current['weatherCode']),
-                'icon':weather_code_to_icon(current['weatherCode']),
-                'precipitation':values['precipitationProbability'],
+                'date': date.strftime('%a %b %d'),
+                'time': date.strftime('%H:%M'),
+                'temp': round(values.get('temperature', 0)),
+                'high': round(values.get('temperature', 0)),  # Using current temp as high
+                'low': round(values.get('temperatureApparent', 0)),  # Using feels like as low
+                'condition': weather_code_to_condition(values.get('weatherCode', 0)),
+                'icon': weather_code_to_icon(values.get('weatherCode', 0)),
+                'precipitation': values.get('precipitationProbability', 0),
+                'humidity': round(values.get('humidity', 0)),
+                'wind_speed': round(values.get('windSpeed', 0))
             })
-            print(location)
-        return {'location':location,'current':current_weather,'forecast':forecast}
-    return None
+            
+        weather_data = {
+            'location': location_name,
+            'current': current_weather,
+            'forecast': forecast,
+            'cached': False
+        }
+        
+        save_cache(location, weather_data)
+        return weather_data
+        
+    except requests.exceptions.RequestException as e:
+        print(f"API request failed: {e}")
+        cached_data = load_cache(location)
+        if cached_data:
+            cached_data['cached'] = True
+            return cached_data
+        return None
 
 def weather_code_to_condition(code):
-    codes = {1000:'Clear',1100:'Mostly Clear'}
-    return codes.get(code,'unknown')
+    codes = {
+        0: 'Unknown',
+        1000: 'Clear',
+        1100: 'Mostly Clear',
+        1101: 'Partly Cloudy',
+        1102: 'Mostly Cloudy',
+        1001: 'Cloudy',
+        2000: 'Fog',
+        2100: 'Light Fog',
+        4000: 'Drizzle',
+        4001: 'Rain',
+        4200: 'Light Rain',
+        4201: 'Heavy Rain',
+        5000: 'Snow',
+        5001: 'Flurries',
+        5100: 'Light Snow',
+        5101: 'Heavy Snow',
+        6000: 'Freezing Drizzle',
+        6001: 'Freezing Rain',
+        6200: 'Light Freezing Rain',
+        6201: 'Heavy Freezing Rain',
+        7000: 'Ice Pellets',
+        7101: 'Heavy Ice Pellets',
+        7102: 'Light Ice Pellets',
+        8000: 'Thunderstorm'
+    }
+    return codes.get(code, 'Unknown')
+
 def weather_code_to_icon(code):
-    codes = {1000:'fas fa-sun',1100:'fas fa-cloud-sun'}
-    return codes.get(code,'unknown')
+    codes = {
+        0: 'fa-solid fa-circle-question',     
+        1000: 'fa-solid fa-sun',              
+        1001: 'fa-solid fa-cloud',            
+        1100: 'fa-solid fa-cloud-sun',        
+        1101: 'fa-solid fa-cloud-sun',       
+        1102: 'fa-solid fa-cloud',           
+        2000: 'fa-solid fa-smog',             
+        2100: 'fa-solid fa-smog',             
+        4000: 'fa-solid fa-cloud-drizzle',    
+        4001: 'fa-solid fa-cloud-rain',      
+        4200: 'fa-solid fa-cloud-showers-heavy',  
+        4201: 'fa-solid fa-cloud-showers-water',  
+        5000: 'fa-solid fa-snowflake',       
+        5001: 'fa-solid fa-snowflakes',       
+        5100: 'fa-solid fa-cloud-snow',   
+        5101: 'fa-solid fa-snowflake',        
+        6000: 'fa-solid fa-cloud-rain',       
+        6001: 'fa-solid fa-cloud-rain',       
+        6200: 'fa-solid fa-cloud-showers-heavy', 
+        6201: 'fa-solid fa-cloud-showers-water',  
+        7000: 'fa-solid fa-icicles',          
+        7101: 'fa-solid fa-icicles',          
+        7102: 'fa-solid fa-icicles',         
+        8000: 'fa-solid fa-cloud-bolt'      
+    }
+    return codes.get(code, 'fa-solid fa-circle-question') 
 
 # Routes
-@app.route('/',methods=['GET', 'POST'])
+@app.route('/', methods=['GET', 'POST'])
 def index():
+    weather_data = None
+    location = 'kolkata'  # Default location
+    
     if request.method == 'POST':
-        location = request.form.get('location','').strip()
-        if location:
-            weather_data = fetch_weather(location)
-        else:
-            weather_data = None
-    else:
-        weather_data = fetch_weather('kolkata')
-    return render_template('index.html',weather=weather_data)
+        location_input = request.form.get('location', '').strip()
+        if location_input:
+            location = location_input
+    
+    weather_data = fetch_weather(location)
+    return render_template('index.html', weather=weather_data)
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
