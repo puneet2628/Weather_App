@@ -3,3 +3,4 @@ data.json
 .env
 instance
 __pycache__
+cache

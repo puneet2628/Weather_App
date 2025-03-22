@@ -10,6 +10,9 @@ import os
 from dotenv import load_dotenv
 from sqlalchemy import func
 from itsdangerous import URLSafeTimedSerializer as Serializer, SignatureExpired
+import requests
+from datetime import datetime, timedelta
+import json
 
 # Load environment variables
 load_dotenv()
@@ -24,6 +27,8 @@ app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
 app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', 'True').lower() in ('true', '1', 't')
 app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
 app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
+# Weather api key secret
+app.config['API_KEY'] = os.getenv('API_KEY')
 
 # Initialize extensions
 db = SQLAlchemy(app)
@@ -101,11 +106,193 @@ def send_confirmation_email(user):
     msg.body = f'Please confirm your email: {confirm_url}'
     mail.send(msg)
 
-# Routes
-@app.route('/')
-def index():
-    return render_template('index.html')
+# Fuction to fetch data from Weather Api
 
+def load_cache(location):
+    cache_file = f'cache/{location.lower()}_weather.json'
+    if os.path.exists(cache_file):
+        with open(cache_file, 'r') as f:
+            cache_data = json.load(f)
+            # Check if cache is less than 30 minutes old
+            cached_time = datetime.fromisoformat(cache_data['cached_at'])
+            if datetime.now() - cached_time < timedelta(minutes=30):
+                return cache_data['weather_data']
+    return None
+
+def save_cache(location, weather_data):
+    if not os.path.exists('cache'):
+        os.makedirs('cache')
+    cache_file = f'cache/{location.lower()}_weather.json'
+    cache_data = {
+        'weather_data': weather_data,
+        'cached_at': datetime.now().isoformat()
+    }
+    with open(cache_file, 'w') as f:
+        json.dump(cache_data, f)
+
+
+# Horizon weather Powwered by Tommorow API
+def fetch_weather(location):
+
+    cached_data = load_cache(location)
+    if cached_data:
+        cached_data['cached'] = True
+        return cached_data
+
+    api_key = app.config['API_KEY']
+    url = (
+        f'https://api.tomorrow.io/v4/weather/forecast'
+        f'?location={location}'
+        f'&timesteps=minutely'  
+        f'&units=metric'
+        f'&apikey={api_key}'
+    )
+    
+    try:
+        response = requests.get(url, timeout=10)
+        
+      
+        if response.status_code == 429:
+            print("Rate limit reached")
+            cached_data = load_cache(location)
+            if cached_data:
+                cached_data['cached'] = True
+                return cached_data
+            return None
+            
+        response.raise_for_status()
+        data = response.json()
+        
+        if 'status_code' in data and data['status_code'] != 200:
+            return None
+
+        if 'timelines' not in data or 'minutely' not in data['timelines']:
+            return None
+            
+
+        current = data['timelines']['minutely'][0]['values']
+        location_name = data['location']['name'] if 'location' in data else location
+        
+        current_weather = {
+            'temp': round(current.get('temperature', 0)),
+            'condition': weather_code_to_condition(current.get('weatherCode', 0)),
+            'icon': weather_code_to_icon(current.get('weatherCode', 0)),
+            'humidity': round(current.get('humidity', 0)),
+            'wind_speed': round(current.get('windSpeed', 0)),
+            'feels_like': round(current.get('temperatureApparent', 0)),
+            'uv_index': current.get('uvIndex', 0),
+            'visibility': round(current.get('visibility', 0)),
+            'pressure': round(current.get('pressureSurfaceLevel', 0))
+        }
+        
+      
+        forecast = []
+        for point in data['timelines']['minutely'][1:6]: 
+            values = point['values']
+            date = datetime.fromisoformat(point['time'].replace('Z', '+00:00'))
+            forecast.append({
+                'date': date.strftime('%a %b %d'),
+                'time': date.strftime('%H:%M'),
+                'temp': round(values.get('temperature', 0)),
+                'high': round(values.get('temperature', 0)),  
+                'low': round(values.get('temperatureApparent', 0)),  
+                'condition': weather_code_to_condition(values.get('weatherCode', 0)),
+                'icon': weather_code_to_icon(values.get('weatherCode', 0)),
+                'precipitation': values.get('precipitationProbability', 0),
+                'humidity': round(values.get('humidity', 0)),
+                'wind_speed': round(values.get('windSpeed', 0))
+            })
+            
+        weather_data = {
+            'location': location_name,
+            'current': current_weather,
+            'forecast': forecast,
+            'cached': False
+        }
+        
+        save_cache(location, weather_data)
+        return weather_data
+        
+    except requests.exceptions.RequestException as e:
+        print(f"API request failed: {e}")
+        cached_data = load_cache(location)
+        if cached_data:
+            cached_data['cached'] = True
+            return cached_data
+        return None
+
+def weather_code_to_condition(code):
+    codes = {
+        0: 'Unknown',
+        1000: 'Clear',
+        1100: 'Mostly Clear',
+        1101: 'Partly Cloudy',
+        1102: 'Mostly Cloudy',
+        1001: 'Cloudy',
+        2000: 'Fog',
+        2100: 'Light Fog',
+        4000: 'Drizzle',
+        4001: 'Rain',
+        4200: 'Light Rain',
+        4201: 'Heavy Rain',
+        5000: 'Snow',
+        5001: 'Flurries',
+        5100: 'Light Snow',
+        5101: 'Heavy Snow',
+        6000: 'Freezing Drizzle',
+        6001: 'Freezing Rain',
+        6200: 'Light Freezing Rain',
+        6201: 'Heavy Freezing Rain',
+        7000: 'Ice Pellets',
+        7101: 'Heavy Ice Pellets',
+        7102: 'Light Ice Pellets',
+        8000: 'Thunderstorm'
+    }
+    return codes.get(code, 'Unknown')
+
+def weather_code_to_icon(code):
+    codes = {
+        0: 'fa-solid fa-circle-question',     
+        1000: 'fa-solid fa-sun',              
+        1001: 'fa-solid fa-cloud',            
+        1100: 'fa-solid fa-cloud-sun',        
+        1101: 'fa-solid fa-cloud-sun',       
+        1102: 'fa-solid fa-cloud',           
+        2000: 'fa-solid fa-smog',             
+        2100: 'fa-solid fa-smog',             
+        4000: 'fa-solid fa-cloud-drizzle',    
+        4001: 'fa-solid fa-cloud-rain',      
+        4200: 'fa-solid fa-cloud-showers-heavy',  
+        4201: 'fa-solid fa-cloud-showers-water',  
+        5000: 'fa-solid fa-snowflake',       
+        5001: 'fa-solid fa-snowflakes',       
+        5100: 'fa-solid fa-cloud-snow',   
+        5101: 'fa-solid fa-snowflake',        
+        6000: 'fa-solid fa-cloud-rain',       
+        6001: 'fa-solid fa-cloud-rain',       
+        6200: 'fa-solid fa-cloud-showers-heavy', 
+        6201: 'fa-solid fa-cloud-showers-water',  
+        7000: 'fa-solid fa-icicles',          
+        7101: 'fa-solid fa-icicles',          
+        7102: 'fa-solid fa-icicles',         
+        8000: 'fa-solid fa-cloud-bolt'      
+    }
+    return codes.get(code, 'fa-solid fa-circle-question') 
+
+# Routes
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    weather_data = None
+    location = 'kolkata'  # Default location
+    
+    if request.method == 'POST':
+        location_input = request.form.get('location', '').strip()
+        if location_input:
+            location = location_input
+    
+    weather_data = fetch_weather(location)
+    return render_template('index.html', weather=weather_data)
+# Horizon weather Powwered by Tommorow API END
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     form = SignupForm()

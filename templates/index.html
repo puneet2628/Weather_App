@@ -3,27 +3,117 @@
 {% block title %}Home{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto text-center">
+<div class="max-w-4xl mx-auto p-4">
     {% if current_user.is_authenticated %}
-        <h1 class="text-4xl font-bold text-gray-800 mb-4">Welcome back, {{ current_user.username }}!</h1>
-        <p class="text-xl text-gray-600 mb-8">Check today's weather forecast</p>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-xl font-semibold mb-4">Current Weather</h2>
-                <!-- Weather content will go here -->
+    <div class="text-center mb-8">
+        <h1 class="text-4xl font-bold text-gray-800 mb-2">Welcome back, {{ current_user.username }}!</h1>
+        <p class="text-xl text-gray-600">Check today's weather forecast</p>
+    </div>
+    
+    <!-- Location Search Form -->
+    <div class="mb-8 flex justify-center">
+        <form method="POST" class="flex gap-2 w-full max-w-md">
+            <input type="text" name="location" placeholder="Enter city name..." required
+                   class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button type="submit" 
+                    class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                <i class="fas fa-search mr-2"></i>Search
+            </button>
+        </form>
+    </div>
+
+    {% if weather %}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Current Weather Card -->
+        <div class="bg-white rounded-xl shadow-lg p-6 transform hover:scale-105 transition-transform">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-2xl font-bold text-gray-800">{{ weather.location | title }}</h2>
+                {% if weather.cached %}
+                <span class="text-xs text-gray-500">
+                    <i class="fas fa-clock mr-1"></i>Using cached data
+                </span>
+                {% endif %}
             </div>
-            <div class="bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-xl font-semibold mb-4">Forecast</h2>
-                <!-- Forecast content will go here -->
+            <div class="flex items-center justify-center gap-4">
+                <i class="{{ weather.current.icon }} text-6xl text-blue-600"></i>
+                <div class="text-center">
+                    <p class="text-5xl font-bold text-gray-800">{{ weather.current.temp }}°C</p>
+                    <p class="text-lg text-gray-600">{{ weather.current.condition }}</p>
+                    <p class="text-sm text-gray-500">Feels like: {{ weather.current.feels_like }}°C</p>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mt-6">
+                <div class="text-center p-2 bg-gray-50 rounded-lg">
+                    <i class="fas fa-tint text-blue-500 mb-1"></i>
+                    <p class="text-sm text-gray-600">Humidity</p>
+                    <p class="text-lg font-semibold">{{ weather.current.humidity }}%</p>
+                </div>
+                <div class="text-center p-2 bg-gray-50 rounded-lg">
+                    <i class="fas fa-wind text-blue-500 mb-1"></i>
+                    <p class="text-sm text-gray-600">Wind</p>
+                    <p class="text-lg font-semibold">{{ weather.current.wind_speed }} m/s</p>
+                </div>
+                <div class="text-center p-2 bg-gray-50 rounded-lg">
+                    <i class="fas fa-sun text-blue-500 mb-1"></i>
+                    <p class="text-sm text-gray-600">UV Index</p>
+                    <p class="text-lg font-semibold">{{ weather.current.uv_index }}</p>
+                </div>
+                <div class="text-center p-2 bg-gray-50 rounded-lg">
+                    <i class="fas fa-eye text-blue-500 mb-1"></i>
+                    <p class="text-sm text-gray-600">Visibility</p>
+                    <p class="text-lg font-semibold">{{ weather.current.visibility }} km</p>
+                </div>
             </div>
         </div>
+
+        <!-- Forecast Card -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">5-Day Forecast</h2>
+            <div class="space-y-4">
+                {% for day in weather.forecast %}
+                <div class="flex items-center justify-between p-3 {% if not loop.last %}border-b{% endif %} hover:bg-gray-50 rounded-lg transition-colors">
+                    <div class="flex items-center gap-3">
+                        <i class="{{ day.icon }} text-2xl text-blue-600"></i>
+                        <div>
+                            <p class="font-semibold text-gray-800">{{ day.date }}</p>
+                            <p class="text-sm text-gray-600">{{ day.condition }}</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-bold text-gray-800">{{ day.high }}° / {{ day.low }}°</p>
+                        <p class="text-sm text-gray-600">
+                            <i class="fas fa-umbrella mr-1"></i>{{ day.precipitation }}%
+                        </p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
     {% else %}
-        <h1 class="text-4xl font-bold text-gray-800 mb-4">Welcome to Horizon App</h1>
-        <p class="text-xl text-gray-600 mb-8">Get accurate weather forecasts for any location</p>
-        <div class="space-x-4">
-            <a href="{{ url_for('signin') }}" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">Sign In</a>
-            <a href="{{ url_for('signup') }}" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700">Sign Up</a>
+    <div class="text-center p-6 bg-red-50 rounded-lg">
+        <i class="fas fa-exclamation-circle text-red-500 text-4xl mb-2"></i>
+        <p class="text-red-600">Unable to fetch weather data. Please try another location.</p>
+    </div>
+    {% endif %}
+    
+    {% else %}
+    <div class="text-center py-8 sm:py-12">
+        <h1 class="text-4xl font-bold text-gray-800 mb-4">Welcome to Horizon Weather</h1>
+        <p class="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+            Get accurate weather forecasts and detailed weather information for any location worldwide.
+        </p>
+        <div class="flex flex-col sm:flex-row justify-center items-center  max-w-xs mx-auto space-x-2.5  ">
+            <a href="{{ url_for('signin') }}" 
+               class="flex items-center justify-center bg-blue-600 text-white px-10 py-3 rounded-lg hover:bg-blue-700 transition-colors w-full sm:w-auto">
+                <i class="fas fa-sign-in-alt mr-2"></i>Sign In
+            </a>
+            <a href="{{ url_for('signup') }}" 
+               class="flex items-center justify-center bg-green-600 text-white px-8 py-3 rounded-lg hover:bg-green-700 transition-colors w-full sm:w-auto">
+                <i class="fas fa-user-plus mr-2"></i>Sign Up
+            </a>
         </div>
+    </div>
     {% endif %}
 </div>
 {% endblock %}
